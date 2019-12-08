@@ -2,7 +2,7 @@
  * Created by Mouncef on 07/12/2019.
  */
 import React from 'react';
-import {FlatList, StyleSheet, Button,TextInput, View, Text} from 'react-native';
+import {FlatList, StyleSheet, Button,TextInput, View, ActivityIndicator} from 'react-native';
 import FilmItem from "./FilmItem";
 import { getFilmsFromApiWithSearchedText } from '../API/TMDBApi'
 
@@ -10,9 +10,12 @@ class Search extends React.Component {
 
     constructor(props){
         super(props);
-        this.searchText= "";
+        this.searchText = "";
+        this.page = 0;
+        this.totalPages = 0;
         this.state = {
-            films: []
+            films: [],
+            isLoading: false
         };
     }
 
@@ -21,31 +24,68 @@ class Search extends React.Component {
     }
 
     _loadFilms() {
-        console.log(this.searchText);
         if (this.searchText.length > 0) {
-            getFilmsFromApiWithSearchedText(this.searchText).then( data => {
-                this.setState({ films: data.results })
+            this.setState({ isLoading: true });
+            getFilmsFromApiWithSearchedText(this.searchText, this.page+1).then( data => {
+                this.page = data.page;
+                this.totalPages = data.total_pages;
+                this.setState({
+                    films: [ ...this.state.films, ...data.results ],
+                    isLoading: false
+                })
             })
         }
 
     }
 
+    _displayLoading() {
+        if (this.state.isLoading) {
+            return (
+                <View style={styles.loading_container}>
+                    <ActivityIndicator size='large' />
+                </View>
+            );
+        }
+    }
+
+    _searchFilms() {
+        this.page = 0;
+        this.totalPages = 0;
+        this.setState({
+            films: []
+        }, () => {
+            console.log("Page : " + this.page + " / TotalPages : " + this.totalPages + " / Nombre de films : " + this.state.films.length)
+            this._loadFilms();
+        });
+    }
+
+    _displayDetailForFilm = (idfilm) => {
+        this.props.navigation.navigate("FilmDetail", { idFilm: idfilm });
+    };
+
     render() {
-        console.log("RENDER");
         return (
             <View style={styles.main_container}>
                 <TextInput
                     style={styles.textinput}
                     placeholder='Titre du film'
                     onChangeText={(text) => this._searchTextInputChanged(text)}
+                    onSubmitEditing={ () => this._searchFilms() }
                 />
-                <Button title='Rechercher' onPress={() => this._loadFilms() }/>
+                <Button title='Rechercher' onPress={() => this._searchFilms() }/>
                 {/* Ici j'ai simplement repris l'exemple sur la documentation de la FlatList */}
                 <FlatList
                     data={this.state.films}
                     keyExtractor={(item) => item.id.toString()}
-                    renderItem={({item}) => <FilmItem film={item} />}
+                    renderItem={({item}) => <FilmItem film={item} displayDetailForFilm={ this._displayDetailForFilm }  />}
+                    onEndReachedThreshold={0.5}
+                    onEndReached={()=> {
+                        if (this.page < this.totalPages) {
+                            this._loadFilms();
+                        }
+                    }}
                 />
+                {this._displayLoading()}
             </View>
         );
     }
@@ -61,8 +101,16 @@ const styles = StyleSheet.create({
         paddingLeft: 5
     },
     main_container: {
-        marginTop: 20,
         flex: 1
+    },
+    loading_container : {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 100,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center'
     }
 });
 
