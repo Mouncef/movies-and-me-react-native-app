@@ -1,6 +1,6 @@
 const initialState = {
   historicFilms: []
-}
+};
 
 function manageHistoricFilms(state = initialState, action) {
   
